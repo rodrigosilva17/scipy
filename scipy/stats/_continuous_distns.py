@@ -8589,8 +8589,8 @@ class powerlaw_gen(rv_continuous):
 
     .. math::
 
-        f(x, a) = a x^{a-1}
-
+        f(x, a) = C x^{a-1}
+        C = a/(x_max**a - x_min**b)
     for :math:`0 \le x \le 1`, :math:`a > 0`.
 
     `powerlaw` takes ``a`` as a shape parameter for :math:`a`.
@@ -8598,7 +8598,7 @@ class powerlaw_gen(rv_continuous):
     %(after_notes)s
 
     For example, the support of `powerlaw` can be adjusted from the default
-    interval ``[0, 1]`` to the interval ``[c, c+d]`` by setting ``loc=c`` and
+    interval ``[x_min, x_max]`` to the interval ``[c, c+d]`` by setting ``loc=c`` and
     ``scale=d``. For a power-law distribution with infinite support, see
     `pareto`.
 
@@ -8608,23 +8608,38 @@ class powerlaw_gen(rv_continuous):
 
     """
     def _shape_info(self):
-        return [_ShapeInfo("a", False, (0, np.inf), (False, False))]
+            return [
+                _ShapeInfo("a", False, (0, np.inf), (False, False)),
+                _ShapeInfo("xmin", False, (0, np.inf), (True, False)),
+                _ShapeInfo("xmax", False, (0, np.inf), (True, False))
+            ]
 
-    def _pdf(self, x, a):
-        # powerlaw.pdf(x, a) = a * x**(a-1)
-        return a*x**(a-1.0)
+    def _pdf(self, x, a, xmin, xmax):
+            if np.any(xmax <= xmin):
+                raise ValueError("xmax must be greater than xmin")
+            return  a * x**(a-1) / (xmax**a - xmin**a)
 
-    def _logpdf(self, x, a):
-        return np.log(a) + sc.xlogy(a - 1, x)
+    def _logpdf(self, x, a, xmin, xmax):
+        if np.any(xmax <= xmin):
+            raise ValueError("xmax must be greater than xmin")
+        return np.log(a) + (a-1)*np.log(x) - np.log(xmax**a - xmin**a)
 
-    def _cdf(self, x, a):
-        return x**(a*1.0)
 
-    def _logcdf(self, x, a):
-        return a*np.log(x)
+    def _cdf(self, x, a, xmin, xmax):
+        if np.any(xmax <= xmin):
+            raise ValueError("xmax must be greater than xmin")
+        return (x**a - xmin**a) / (xmax**a - xmin**a)
 
-    def _ppf(self, q, a):
-        return pow(q, 1.0/a)
+
+    def _logcdf(self, x, a, xmin, xmax):
+        if np.any(xmax <= xmin):
+            raise ValueError("xmax must be greater than xmin")
+        return np.log(x**a - xmin**a) - np.log(xmax**a - xmin**a)
+
+    def _ppf(self, q, a, xmin, xmax):
+        if np.any(xmax <= xmin):
+            raise ValueError("xmax must be greater than xmin")
+        return (q*(xmax**a - xmin**a) + xmin**a)**(1/a)
 
     def _sf(self, p, a):
         return -sc.powm1(p, a)
